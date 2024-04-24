@@ -1,9 +1,11 @@
 const express = require("express");
 const { Pool } = require("pg")
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express()
 const PORT = process.env.PORT || 3000
-
+const JWT_SECRET = 'your_jwt_secret'
 
 const pool = new Pool({
     user: "username",
@@ -15,6 +17,89 @@ const pool = new Pool({
 })
 
 app.use(express.json())
+
+
+// authUser
+
+const authUser = (req, res, next) => {
+    const token = req.header('Authorization');
+    if (!token) return res.status(401).json({ error: 'token missing' });
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded.user;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: 'Invalid token.' });
+    }
+}
+
+// regANewUser
+
+app.post('/register', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        // CheckIfExists
+        const userExists = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (userExists.rows.length > 0) {
+            return res.status(400).json({ error: 'Username already exists.' });
+        }
+
+        // HashPasword
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // sendUserToDB
+        const result = await pool.query(
+            'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username',
+            [username, hashedPassword]
+        );
+
+        const user = result.rows[0];
+        res.json(user);
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// loginAUser
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        // CheckUserExist
+        const user = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+        if (user.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid username or password.' });
+        }
+
+        // CheckCorrectPassword
+        const passwordMatch = await bcrypt.compare(password, user.rows[0].password);
+        if (!passwordMatch) {
+            return res.status(400).json({ error: 'Invalid username or password.' });
+        }
+
+        // GenerateToken
+        const token = jwt.sign({ user: { id: user.rows[0].id, username: user.rows[0].username } }, JWT_SECRET);
+        res.json({ token });
+    } catch (err) {
+        console.error('Error logging in:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// GetUserInfo
+app.get('/user', authenticateUser, async (req, res) => {
+    try {
+        res.json(req.user);
+    } catch (err) {
+        console.error('Error fetching current user:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
 
 // connectionTesting
 
@@ -29,9 +114,9 @@ pool.query('SELECT NOW()', (err, res) => {
 // createNote
 
 app.post("/notes", async (req, res) => {
-    const { title, content } = req.body;
+    const { title, content, userId } = req.body;
     try {
-        const result = await pool.query('INSERT INTO notes (title, content) VALUES ($1, $2) RETURNING *', [title, content])
+        const result = await pool.query('INSERT INTO notes (title, content, userId) VALUES ($1, $2) RETURNING *', [title, content, userId])
     } catch (error) {
         console.error("Err creating a note", err)
         res.status(500).json({ error: "INT server error" })
