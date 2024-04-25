@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const app = express()
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 const JWT_SECRET = 'your_jwt_secret'
 
 const pool = new Pool({
@@ -89,6 +89,12 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// LogoutJust for the message
+app.post('/logout', (req, res) => {
+    // No action on the backend TODO in the frontend to remove the token
+    res.json({ message: 'Logout successful' });
+});
+
 // GetUserInfo
 app.get('/user', authUser, async (req, res) => {
     try {
@@ -117,6 +123,7 @@ app.post("/notes", async (req, res) => {
     const { title, content, userId } = req.body;
     try {
         const result = await pool.query('INSERT INTO notes (title, content, userId) VALUES ($1, $2) RETURNING *', [title, content, userId])
+        res.status(200).json({ message: "note added, all good :)" })
     } catch (error) {
         console.error("Err creating a note", err)
         res.status(500).json({ error: "INT server error" })
