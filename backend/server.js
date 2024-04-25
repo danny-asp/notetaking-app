@@ -8,10 +8,10 @@ const PORT = process.env.PORT || 3000
 const JWT_SECRET = 'your_jwt_secret'
 
 const pool = new Pool({
-    user: "username",
+    user: "postgres",
     host: "localhost",
-    database: "database",
-    password: "pass",
+    database: "notetaking-app",
+    password: "112358",
     port: 5432
 
 })
@@ -90,7 +90,7 @@ app.post('/login', async (req, res) => {
 });
 
 // GetUserInfo
-app.get('/user', authenticateUser, async (req, res) => {
+app.get('/user', authUser, async (req, res) => {
     try {
         res.json(req.user);
     } catch (err) {
@@ -122,6 +122,8 @@ app.post("/notes", async (req, res) => {
         res.status(500).json({ error: "INT server error" })
     }
 })
+
+// TODO getNotes by user id
 
 // updateNote
 
