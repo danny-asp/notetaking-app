@@ -76,6 +76,7 @@ function App() {
       setContent('');
       handleClose();
       toast.success('A new note is successfully created!');
+      fetchUserNotes();
     } catch (err) {
       console.error('Error creating a note', err.response.data.error); // log error message
       // Handle error in your UI, e.g., show a message to the user
