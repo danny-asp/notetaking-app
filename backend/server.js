@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require('cors');
 const { Pool } = require("pg")
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -15,7 +16,7 @@ const pool = new Pool({
     port: 5432
 
 })
-
+app.use(cors());
 app.use(express.json())
 
 
@@ -82,7 +83,7 @@ app.post('/login', async (req, res) => {
 
         // GenerateToken
         const token = jwt.sign({ user: { id: user.rows[0].id, username: user.rows[0].username } }, JWT_SECRET);
-        res.json({ token });
+        res.json({ token, user });
     } catch (err) {
         console.error('Error logging in:', err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -122,44 +123,39 @@ pool.query('SELECT NOW()', (err, res) => {
 app.post("/notes", async (req, res) => {
     const { title, content, userId } = req.body;
     try {
-        const result = await pool.query('INSERT INTO notes (title, content, userId) VALUES ($1, $2) RETURNING *', [title, content, userId])
+        const result = await pool.query('INSERT INTO notes (title, content, userId) VALUES ($1, $2, $3) RETURNING *', [title, content, userId])
         res.status(200).json({ message: "note added, all good :)" })
     } catch (error) {
-        console.error("Err creating a note", err)
+        console.error("Err creating a note", error)
         res.status(500).json({ error: "INT server error" })
     }
 })
 
-// TODO getNotes by user id
 
-// updateNote
-
-app.put('/notes/:id', async (req, res) => {
-    const { id } = req.params;
-    const { title, content } = req.body;
-    try {
-        const result = await pool.query(
-            'UPDATE notes SET title = $1, content = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-            [title, content, id]
-        );
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error('Error updating note:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
 
 // getAllNotes
 
 app.get("/notes", async (req, res) => {
+    const { userId } = req.body;
     try {
-        const result = await pool.query('SELECT * FROM notes');
-        res.json(result.rows)
-    } catch (err) {
-        console.error("error getting all notes", err);
-        res.status(500).json({ error: "INT Server Error" })
+        const result = await pool.query('SELECT * FROM notes WHERE userid = $1', [userId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Error getting notes for user", error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
-})
+});
+
+app.get("/notes/:userId", async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM notes WHERE userid = $1', [userId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Error getting notes for user", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 // delNote
 app.delete('/notes/:id', async (req, res) => {
@@ -175,5 +171,5 @@ app.delete('/notes/:id', async (req, res) => {
 
 
 app.listen(PORT, () => {
-    console.log("SERVER Running")
+    console.log(`SERVER Running ${PORT}`)
 })
